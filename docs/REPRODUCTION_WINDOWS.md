@@ -94,6 +94,22 @@ uv run sm-train --run-name smoke-4090 --data.npz-dir data/npz/lafan1 `
 
 与 README 中 LAFAN1 的 0.56–0.59 区间吻合。注意该检查点是在 BONES-SEED 上训练的，属于跨数据集评测；README 也指出仅本体感受的观测在 100–300 s 长片段上会漂移，整条回报饱和在 ~0.58。失败数 20/40 高于 README 的 3–9，符合"跨数据集 + 未在 LAFAN1 上训练"的预期。
 
+### 3. 确定性回放渲染
+
+```powershell
+uv run python C:\DSH\win\eval_wrapped.py scripts/media/record_rollout.py `
+  --ckpt logs/e8-release/e8_boneseed_ckpt_0100000.pt --npz-dir data/npz/lafan1 `
+  --clips walk1_subject1 --out media/rollouts.npz
+
+$env:MUJOCO_GL="glfw"
+uv run python scripts/media/render_rollout.py --traj media/rollouts.npz --out-dir media/clips `
+  --segments "walk1_subject1:0:4" --titles "walk1_subject1=Walk (LAFAN1)" --concat media/showcase.mp4
+```
+
+- 输出 `media/showcase.mp4`（4 s，1280×720）：实心 = 仿真中的策略，蓝色半透明 = 参考动作
+- 片段内归一化回报 0.639，与整条评测一致
+- 第 5 个坑：`render_rollout.py` 直接调 `ffmpeg` 命令。Windows 上把它指向 `imageio_ffmpeg` 自带的二进制即可（本机 shim：`C:\DSH\win\bin\ffmpeg.exe`）
+
 ## 结论
 
 - 训练链路（数据 → 环境 → 世界模型 → BPTT 策略更新 → 检查点）在本机可复现。
@@ -104,4 +120,4 @@ uv run sm-train --run-name smoke-4090 --data.npz-dir data/npz/lafan1 `
 
 - LAFAN1 完整训练（1×5090 约 3 h，`--schedule.max-hours 3`）
 - BONES-SEED 全量数据与紧凑库
-- `scripts/play.py` 交互回放与 `scripts/media/render_rollout.py` 渲染（需要 GL 环境，Windows 上可另行验证）
+- `scripts/play.py` 交互回放（需要交互式窗口；离屏渲染链路已单独验证通过）
